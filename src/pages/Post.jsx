@@ -1,67 +1,114 @@
-import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import appwriteService from "../appwrite/configure";
-import { Button, Container } from "../components";
-import parse from "html-react-parser";
-import { useSelector } from "react-redux";
 
-export default function Post() {
-    const [post, setPost] = useState(null);
+function Post() {
     const { slug } = useParams();
+    const [post, setPost] = useState(null);
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    const userData = useSelector((state) => state.auth.userData);
-
-    const isAuthor = post && userData ? post.userId === userData.$id : false;
-
     useEffect(() => {
-        if (slug) {
-            appwriteService.getPost(slug).then((post) => {
-                if (post) setPost(post);
-                else navigate("/");
-            });
-        } else navigate("/");
-    }, [slug, navigate]);
-
-    const deletePost = () => {
-        appwriteService.deletePost(post.$id).then((status) => {
-            if (status) {
-                appwriteService.deleteFile(post.featuredImage);
-                navigate("/");
+        const fetchPost = async () => {
+            try {
+                const response = await appwriteService.getPost(slug);
+                if (response) {
+                    setPost(response);
+                    // Fetch image URL if needed
+                    const imageUrl = await fetchImageUrl(response.featuredImage);
+                    setPost(prevPost => ({ ...prevPost, imageUrl }));
+                }
+            } catch (error) {
+                console.error("Error fetching post:", error);
+            } finally {
+                setLoading(false);
             }
-        });
+        };
+
+        // Function to fetch image URL
+        const fetchImageUrl = async (imageId) => {
+            try {
+                const imageFile = await appwriteService.getFileView(imageId);
+                return imageFile.href;  // Returns the URL of the file for display
+            } catch (error) {
+                console.error("Error fetching image URL:", error);
+                return null;
+            }
+        };
+
+        fetchPost();
+    }, [slug]);
+
+    // Handle delete post
+    const handleDelete = async () => {
+        if (!window.confirm("Are you sure you want to delete this post?")) return;
+
+        try {
+            await appwriteService.deletePost(post.$id);
+            navigate("/all-posts"); // Redirect after delete
+        } catch (error) {
+            console.error("Error deleting post:", error);
+        }
     };
 
-    return post ? (
-        <div className="py-8">
-            <Container>
-                <div className="w-full flex justify-center mb-4 relative border rounded-xl p-2">
-                    <img
-                        src={appwriteService.getFilePreview(post.featuredImage)}
-                        alt={post.title}
-                        className="rounded-xl"
-                    />
+    return (
+        <div className="min-h-screen flex flex-col items-center py-8 bg-gray-100">
+            {loading ? (
+                <p className="text-gray-500">Loading post...</p>
+            ) : post ? (
+                <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-2xl">
+                    {/* Back Button positioned at the top left with "Back" text */}
+                    <button
+                        onClick={() => navigate(-1)}  // Go back to the previous page
+                        className="absolute top-40 left-48 p-2 text-gray-600 hover:text-blue-600 rounded-full transition-colors duration-300 hover:bg-gray-200 flex items-center"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            className="w-6 h-6 mr-2"  // Add margin-right to separate icon and text
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M15 19l-7-7 7-7"
+                            />
+                        </svg>
+                        <span>Back</span>  {/* Add the Back text */}
+                    </button>
 
-                    {isAuthor && (
-                        <div className="absolute right-6 top-6">
-                            <Link to={`/edit-post/${post.$id}`}>
-                                <Button bgColor="bg-green-500" className="mr-3">
-                                    Edit
-                                </Button>
-                            </Link>
-                            <Button bgColor="bg-red-500" onClick={deletePost}>
-                                Delete
-                            </Button>
-                        </div>
-                    )}
-                </div>
-                <div className="w-full mb-6">
-                    <h1 className="text-2xl font-bold">{post.title}</h1>
-                </div>
-                <div className="browser-css">
-                    {parse(post.content)}
+                    {/* Post Content */}
+                    <img
+                        src={post.imageUrl || post.featuredImage}  // Use imageUrl if available
+                        alt={post.title}
+                        className="w-full rounded-lg mb-4"
+                    />
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">{post.title}</h1>
+                    <p className="text-gray-600" dangerouslySetInnerHTML={{ __html: post.content }}></p>
+
+                    {/* Edit & Delete Buttons */}
+                    <div className="mt-6 flex justify-between">
+                        <button
+                            onClick={() => navigate(`/edit-post/${post.$id}`)}
+                            className="bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition hover:bg-blue-700"
+                        >
+                            ✏️ Edit
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition hover:bg-red-700"
+                        >
+                            🗑️ Delete
+                        </button>
                     </div>
-            </Container>
+                </div>
+            ) : (
+                <p className="text-center text-gray-500">Post not found.</p>
+            )}
         </div>
-    ) : null;
+    );
 }
+
+export default Post;

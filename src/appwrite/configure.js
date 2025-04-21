@@ -1,21 +1,20 @@
 import config from "../config/config";
-import { Client, ID, Databases, Storage ,Query } from "appwrite";
+import { Client, ID, Databases, Storage, Query } from "appwrite";
 
-export class Service{ 
-    client = new Client()
+export class Service {
+    client = new Client();
     databases;
     bucket;
 
-    constructor(){
+    constructor() {
         this.client
             .setEndpoint(config.appwriteUrl)
             .setProject(config.appwriteProjectId);
-         this.databases= new Databases(this.client)
-         this.bucket = new Storage(this.client)
+        this.databases = new Databases(this.client);
+        this.bucket = new Storage(this.client);
     }
 
-    async createPost({title, slug, content, featuredImage,
-    status, userId}){
+    async createPost({ title, slug, content, featuredImage, status, userId }) {
         try {
             return await this.databases.createDocument(
                 config.appwriteDatabaseId,
@@ -28,13 +27,13 @@ export class Service{
                     status,
                     userId,
                 }
-            )
+            );
         } catch (error) {
             throw error;
         }
     }
 
-    async updatePost( slug, {title, content, featuredImage, status}){
+    async updatePost(slug, { title, content, featuredImage, status }) {
         try {
             return await this.databases.updateDocument(
                 config.appwriteDatabaseId,
@@ -46,86 +45,74 @@ export class Service{
                     featuredImage,
                     status,
                 }
-            )
+            );
         } catch (error) {
             throw error;
         }
     }
 
-    async deletePost(slug){
+    async deletePost(slug) {
         try {
-            await this.databases.deleteDocument.apply(
+            await this.databases.deleteDocument(
                 config.appwriteDatabaseId,
                 config.appwriteCollectionId,
                 slug
-                
-            )
-            return true
+            );
+            return true;
         } catch (error) {
             throw error;
         }
     }
 
-    async getPost(slug){
+    async getPost(slug) {
         try {
             return await this.databases.getDocument(
                 config.appwriteDatabaseId,
                 config.appwriteCollectionId,
                 slug
-            )
+            );
         } catch (error) {
             throw error;
         }
     }
 
-    async getPosts(queries = [Query.equal("status" , "active")]){
+    async getPosts(queries = [Query.equal("status", "active")]) {
         try {
             return await this.databases.listDocuments(
                 config.appwriteDatabaseId,
                 config.appwriteCollectionId,
                 queries
-            )
+            );
         } catch (error) {
             throw error;
         }
     }
 
-    // file service
-    
-    async uploadFile(file){
+    // File service
+    async uploadFile(file) {
         try {
             return await this.bucket.createFile(
                 config.appwriteBucketId,
                 ID.unique(),
                 file
-            )
+            );
         } catch (error) {
             throw error;
         }
     }
 
-    async deleteFile(fileId){
+    async deleteFile(fileId) {
         try {
-            return await this.bucket.createFile(
-                config.appwriteBucketId,
-                ID.unique(),
-                fileId
-            )
+            return await this.bucket.deleteFile(config.appwriteBucketId, fileId);
         } catch (error) {
             throw error;
         }
     }
 
-    getFilePreview(fileId){
-        return (
-            this.bucket.getFilePreview(
-                config.appwriteBucketId,
-                fileId
-            )
-        )
+    getFileView(fileId) {
+        return this.bucket.getFileDownload(config.appwriteBucketId, fileId);
     }
 }
 
-const appwriteService = new Service()
-
+const appwriteService = new Service();
 export default appwriteService;

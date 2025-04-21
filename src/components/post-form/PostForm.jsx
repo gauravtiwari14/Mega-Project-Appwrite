@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button, Input, RTE, Select } from "..";
 import appwriteService from "../../appwrite/configure";
@@ -19,27 +19,24 @@ export default function PostForm({ post }) {
     const userData = useSelector((state) => state.auth.userData);
 
     const submit = async (data) => {
-        if (post) {
-            const file = data.image[0] ? await appwriteService.uploadFile(data.image[0]) : null;
+        const file = data.image[0] ? await appwriteService.uploadFile(data.image[0]) : null;
 
+        if (post) {
             if (file) {
                 appwriteService.deleteFile(post.featuredImage);
             }
 
             const dbPost = await appwriteService.updatePost(post.$id, {
                 ...data,
-                featuredImage: file ? file.$id : undefined,
+                featuredImage: file ? file.$id : post.featuredImage,
             });
 
             if (dbPost) {
                 navigate(`/post/${dbPost.$id}`);
             }
         } else {
-            const file = await appwriteService.uploadFile(data.image[0]);
-
             if (file) {
-                const fileId = file.$id;
-                data.featuredImage = fileId;
+                data.featuredImage = file.$id;
                 const dbPost = await appwriteService.createPost({ ...data, userId: userData.$id });
 
                 if (dbPost) {
@@ -50,17 +47,12 @@ export default function PostForm({ post }) {
     };
 
     const slugTransform = useCallback((value) => {
-        if (value && typeof value === "string")
-            return value
-                .trim()
-                .toLowerCase()
-                .replace(/[^a-zA-Z\d\s]+/g, "-")
-                .replace(/\s/g, "-");
-
-        return "";
+        return value
+            ? value.trim().toLowerCase().replace(/[^a-zA-Z\d\s]+/g, "-").replace(/\s/g, "-")
+            : "";
     }, []);
 
-    React.useEffect(() => {
+    useEffect(() => {
         const subscription = watch((value, { name }) => {
             if (name === "title") {
                 setValue("slug", slugTransform(value.title), { shouldValidate: true });
@@ -72,48 +64,53 @@ export default function PostForm({ post }) {
 
     return (
         <form onSubmit={handleSubmit(submit)} className="flex flex-wrap">
+            {/* Left Section */}
             <div className="w-2/3 px-2">
                 <Input
                     label="Title :"
-                    placeholder="Title"
+                    placeholder="Enter title"
                     className="mb-4"
                     {...register("title", { required: true })}
                 />
                 <Input
                     label="Slug :"
-                    placeholder="Slug"
+                    placeholder="Auto-generated slug"
                     className="mb-4"
                     {...register("slug", { required: true })}
-                    onInput={(e) => {
-                        setValue("slug", slugTransform(e.currentTarget.value), { shouldValidate: true });
-                    }}
+                    onInput={(e) => setValue("slug", slugTransform(e.currentTarget.value), { shouldValidate: true })}
                 />
                 <RTE label="Content :" name="content" control={control} defaultValue={getValues("content")} />
             </div>
+
+            {/* Right Section */}
             <div className="w-1/3 px-2">
-                <Input
-                    label="Featured Image :"
+                <label className="block text-sm font-medium text-gray-700 mb-2">Featured Image :</label>
+                <input
                     type="file"
-                    className="mb-4"
                     accept="image/png, image/jpg, image/jpeg, image/gif"
+                    className="mb-4 block w-full text-sm text-gray-500 border border-gray-300 rounded-lg cursor-pointer bg-gray-50"
                     {...register("image", { required: !post })}
                 />
+
                 {post && (
                     <div className="w-full mb-4">
                         <img
-                            src={appwriteService.getFilePreview(post.featuredImage)}
+                            src={appwriteService.getFileView(post.featuredImage).href} // Update this line
                             alt={post.title}
-                            className="rounded-lg"
+                            className="rounded-lg shadow-lg transition-transform transform hover:scale-105 duration-300"
                         />
                     </div>
                 )}
+
+
                 <Select
                     options={["active", "inactive"]}
                     label="Status"
                     className="mb-4"
                     {...register("status", { required: true })}
                 />
-                <Button type="submit" bgColor={post ? "bg-green-500" : undefined} className="w-full">
+
+                <Button type="submit" bgColor={post ? "bg-green-500" : "bg-blue-500"} className="w-full hover:opacity-90 transition-opacity">
                     {post ? "Update" : "Submit"}
                 </Button>
             </div>
